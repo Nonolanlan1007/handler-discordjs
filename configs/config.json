@@ -2,6 +2,6 @@
     "token": "TOKEN",
     "prefix": "!",
     "botsAllowed": false,
-    "color": "#f2ac34",
-    "owner": "692374264476860507"
+    "color": "your_color",
+    "owner": "your_id"
 }
