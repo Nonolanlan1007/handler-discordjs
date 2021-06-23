@@ -6,8 +6,8 @@
 # Modules requis :
 > • Pour installer un module, ouvrez un terminal, et tapez la commande `npm install <nom du module>`.  
 >
-> • Voici la liste de tous les modules à installer : `discord.js`, `pretty-ms`, `moment`, `colors`, et `easy-json-database` (vous pouvez en rajouter d'autres si besoin).
+> • Voici la liste de tous les modules à installer : `discord.js`, `pretty-ms`, et `colors` (vous pouvez en rajouter d'autres si besoin).
 # Configuration :
 > Pour configurer votre robot, vous pouvez modifier les informations dans les fichiers du dossier `configs`.
 # Support :
-> • Pour me contacter, vous pouvez ouvrir une issue en cliquant [ici](https://github.com/Nonolanlan1007/Yop-Bot/issues/new)
+> • Pour me contacter, vous pouvez ouvrir une issue en cliquant [ici](https://github.com/Nonolanlan1007/Discord.JS_base/issues/new)
