@@ -3,7 +3,8 @@ const { Client, Collection } = require('discord.js'),
       config = require('./configs/config.json'),
       fs = require('fs'),
       { green, red, magenta, blue, underline } = require('colors'),
-      Database = require('easy-json-database');
+      { yes, no } = require("./configs/emojis.json"),
+      { version } = require("./package.json");
 
 client.prefix = config.prefix;
 client.color = config.color;
@@ -12,9 +13,7 @@ client.no = no;
 client.botAllowed = config.botAllowed;
 client.commands = new Collection();
 client.events = new Collection();
-client.botlogs = botslogs;
-client.verificator = verificator;
-client.version = "1.9";
+client.version = version;
 
 // database
 
