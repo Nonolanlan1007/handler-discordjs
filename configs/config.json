@@ -1,7 +1,0 @@
-{
-    "token": "your_token",
-    "prefix": "!",
-    "botsAllowed": false,
-    "color": "your_color",
-    "owner": "your_id"
-}

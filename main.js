@@ -1,58 +1,249 @@
-const { Client, Collection } = require('discord.js'),
-      client = new Client(),
-      config = require('./configs/config.json'),
-      fs = require('fs'),
-      { green, red, magenta, blue, underline } = require('colors'),
-      { yes, no } = require("./configs/emojis.json"),
-      { version } = require("./package.json");
+const { Client, Intents, Collection } = require("discord.js"),
+      { version } = require("./package.json"),
+      { readdirSync, read } = require("fs"),
+      { join } = require("path"),
+      colors = require("colors"),
+      config = require("./config.json")
 
-client.prefix = config.prefix;
-client.color = config.color;
-client.yes = yes;
-client.no = no;
-client.botAllowed = config.botAllowed;
+
+const client = new Client({
+    partials: ["CHANNEL", "GUILD_MEMBER", "MESSAGE", "REACTION", "USER"],
+    intents: [
+        Intents.FLAGS.GUILDS,
+        Intents.FLAGS.GUILD_MEMBERS,
+        Intents.FLAGS.GUILD_BANS,
+        Intents.FLAGS.GUILD_EMOJIS_AND_STICKERS,
+        Intents.FLAGS.GUILD_INTEGRATIONS,
+        Intents.FLAGS.GUILD_WEBHOOKS,
+        Intents.FLAGS.GUILD_INVITES,
+        Intents.FLAGS.GUILD_VOICE_STATES,
+        Intents.FLAGS.GUILD_PRESENCES,
+        Intents.FLAGS.GUILD_MESSAGES,
+        Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
+        Intents.FLAGS.GUILD_MESSAGE_TYPING,
+        Intents.FLAGS.DIRECT_MESSAGES,
+        Intents.FLAGS.DIRECT_MESSAGE_REACTIONS,
+        Intents.FLAGS.DIRECT_MESSAGE_TYPING
+    ]
+});
+
 client.commands = new Collection();
-client.events = new Collection();
+client.slashCommands = new Collection();
+client.cooldowns = new Collection()
 client.version = version;
+client.config = require("./config.json");
+client.colors = {
+    red: "",
+    basic: "",
+    green: ""
+}
 
-// database
-
-
-["aliases", "categories"].forEach(x => { client[x] = new Collection() });
-
-fs.readdir("./commands/", (err, files) => {
-    if (err) return console.error;
-    files.forEach(file => {
-        if (!file.endsWith('.js')) return undefined;
-        const props = require(`./commands/${file}`),
-              cmdName = file.split('.')[0];
-        if (props.help.aliases) {
-            props.help.aliases.forEach(alias => {
-                client.aliases.set(alias, props);
-            });
+// load commands
+let count = 0;
+const folders = readdirSync(join(__dirname, "commands"))
+for (let i = 0; i < folders.length; i++) {
+    const commands = readdirSync(join(__dirname, "commands", folders[i]))
+    count = count + commands.length;
+    for (const c of commands) {
+        try {
+            const command = require(join(__dirname, "commands", folders[i], c))
+            client.commands.set(command.name, command)
+            if (command.aliases.length > 0) commands.aliases.forEach(a => { client.commands.set(command.name, command) })
         }
-        if (props.help.category) {
-            client.categories.set(props.help.category, props);
+        catch (err) {
+            console.log(colors.red("[COMMANDS]") + ` ➜ Impossible de charger la commande ${c} : ${err.stack || err}`)
         }
-        console.log(`${green('[COMMANDS]')} Commande ${underline(cmdName)} chargée avec succès !`)
-        client.commands.set(cmdName, props);
-    })
-});
+    }
+    console.log(colors.green("[COMMANDS]") + ` ➜ ${client.commands.size}/${count} commande(s) chargées !`)
+}
 
-fs.readdir("./events/", (err, files) => {
-    if (err) return console.error;
-    files.forEach(file => {
-        if (!file.endsWith('.js')) return undefined;
-        const event = require(`./events/${file}`),
-              eventName = file.split('.')[0];
-        console.log(`${magenta('[EVENTS]')} Évènement ${eventName} chargé avec succès !`)
-        client.events.set(eventName, event);
-        client.on(eventName, event.bind(null, client));
-    })
-});
-setTimeout(() => {
-    console.log('==================================================================' + '\n' + blue(`Récapitulatif : ${client.commands.size} commandes chargées et ${client.events.size} évènements chargés`) + '\n' + '==================================================================')
-}, 500)
+// load events
+let count = 0;
+const folders = readdirSync(join(__dirname, "events"));
+for (let i = 0; i < folders.length; i++) {
+    const events = readdirSync(join(__dirname, "events", folders[i]))
+    count = count + events.length;
+    for (const e of events) {
+        try {
+            const event = require(join(__dirname, "events", folders[i], e))
+            const eName = e.split(".")[0];
+            client.on(eName, event.bind(null, client))
+            delete require.cache[require.resolve(join(__dirname, "events", e))]
+        }
+        catch (err) {
+            console.log(colors.red("[EVENTS]") + ` ➜ Impossible de charger l'évènement ${e} : ${err.stack || err}`)
+        }
+    }
+    console.log(colors.green("[EVENTS]") + ` ➜ ${count}/${folders.length}`)
+}
+
+// load slashs
+const { readdirSync, lstatSync } = require("fs");
+const { SlashCommandBuilder } = require('@discordjs/builders');
+const config = require("../configs/config.json");
+const dirSetup = config.slashCommandsDirs;
+module.exports = (client) => {
+    try {
+		let allCommands = [];
+        readdirSync("./slashCommands/").forEach((dir) => {
+			if(lstatSync(`./slashCommands/${dir}`).isDirectory()) {
+				const groupName = dir;
+				const cmdSetup = dirSetup.find(d=>d.Folder == dir);
+				//If its a valid cmdsetup
+				if(cmdSetup && cmdSetup.Folder) {
+					//Set the SubCommand as a Slash Builder
+					const subCommand = new SlashCommandBuilder().setName(String(cmdSetup.CmdName).replace(/\s+/g, '_').toLowerCase()).setDescription(String(cmdSetup.CmdDescription));
+					//Now for each file in that subcommand, add a command!
+					const slashCommands = readdirSync(`./slashCommands/${dir}/`).filter((file) => file.endsWith(".js"));
+					for (let file of slashCommands) {
+						let pull = require(`../slashCommands/${dir}/${file}`);
+						if (pull.name && pull.description) {
+							subCommand
+							.addSubcommand((subcommand) => {
+								subcommand.setName(String(pull.name).toLowerCase()).setDescription(pull.description)
+								if(pull.options && pull.options.length > 0){
+									for(const option of pull.options){
+										if(option.User && option.User.name && option.User.description){
+											subcommand.addUserOption((op) =>
+												op.setName(String(option.User.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.User.description).setRequired(option.User.required)
+											)
+										} else if(option.Integer && option.Integer.name && option.Integer.description){
+											subcommand.addIntegerOption((op) =>
+												op.setName(String(option.Integer.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.Integer.description).setRequired(option.Integer.required)
+											)
+										} else if(option.String && option.String.name && option.String.description){
+											subcommand.addStringOption((op) =>
+												op.setName(String(option.String.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.String.description).setRequired(option.String.required)
+											)
+										} else if(option.Channel && option.Channel.name && option.Channel.description){
+											subcommand.addChannelOption((op) =>
+												op.setName(String(option.Channel.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.Channel.description).setRequired(option.Channel.required)
+											)
+										} else if(option.Role && option.Role.name && option.Role.description){
+											subcommand.addRoleOption((op) =>
+												op.setName(String(option.Role.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.Role.description).setRequired(option.Role.required)
+											)
+										} else if(option.StringChoices && option.StringChoices.name && option.StringChoices.description && option.StringChoices.choices && option.StringChoices.choices.length > 0){
+											subcommand.addStringOption((op) =>
+												op.setName(String(option.StringChoices.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.StringChoices.description).setRequired(option.StringChoices.required)
+												.addChoices(option.StringChoices.choices.map(c=> [String(c[0]).replace(/\s+/g, '_').toLowerCase(),String(c[1])] )),
+											)
+										} else if(option.IntChoices && option.IntChoices.name && option.IntChoices.description && option.IntChoices.choices && option.IntChoices.choices.length > 0){
+											subcommand.addStringOption((op) =>
+												op.setName(String(option.IntChoices.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.IntChoices.description).setRequired(option.IntChoices.required)
+												.addChoices(option.IntChoices.choices.map(c=> [String(c[0]).replace(/\s+/g, '_').toLowerCase(),parseInt(c[1])] )),
+											)
+										} else {
+											console.log(`Une option est manquante dans la description ou le nom de la commande ${pull.name}`)
+										}
+									}
+								}
+								return subcommand;
+							})
+							client.slashCommands.set(String(cmdSetup.CmdName).replace(/\s+/g, '_').toLowerCase() + " " + pull.name, pull)
+						} else {
+							console.log(file, `[ERROR] Il me manque un help.name, ou help.name n'est pas un string.`.brightRed);
+							continue;
+						}
+					}
+					//add the subcommand to the array
+					allCommands.push(subCommand.toJSON());
+				} 
+				else {
+					return console.log(`Le dossier de sous-commandes ${dir} n'est pas configuré dans le fichier config.json`);
+				}
+			} else {
+				let pull = require(`../slashCommands/${dir}`);
+				if (pull.name && pull.description) {
+					let Command = new SlashCommandBuilder().setName(String(pull.name).toLowerCase()).setDescription(pull.description);
+						if(pull.options && pull.options.length > 0){
+							for(const option of pull.options){
+								if(option.User && option.User.name && option.User.description){
+									Command.addUserOption((op) =>
+										op.setName(String(option.User.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.User.description).setRequired(option.User.required)
+									)
+								} else if(option.Integer && option.Integer.name && option.Integer.description){
+									Command.addIntegerOption((op) =>
+										op.setName(String(option.Integer.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.Integer.description).setRequired(option.Integer.required)
+									)
+								} else if(option.String && option.String.name && option.String.description){
+									Command.addStringOption((op) =>
+										op.setName(String(option.String.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.String.description).setRequired(option.String.required)
+									)
+								} else if(option.Channel && option.Channel.name && option.Channel.description){
+									Command.addChannelOption((op) =>
+										op.setName(String(option.Channel.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.Channel.description).setRequired(option.Channel.required)
+									)
+								} else if(option.Role && option.Role.name && option.Role.description){
+									Command.addRoleOption((op) =>
+										op.setName(String(option.Role.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.Role.description).setRequired(option.Role.required)
+									)
+								} else if(option.StringChoices && option.StringChoices.name && option.StringChoices.description && option.StringChoices.choices && option.StringChoices.choices.length > 0){
+									Command.addStringOption((op) =>
+										op.setName(String(option.StringChoices.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.StringChoices.description).setRequired(option.StringChoices.required)
+										.addChoices(option.StringChoices.choices.map(c=> [String(c[0]).replace(/\s+/g, '_').toLowerCase(),String(c[1])] )),
+									)
+								} else if(option.IntChoices && option.IntChoices.name && option.IntChoices.description && option.IntChoices.choices && option.IntChoices.choices.length > 0){
+									Command.addStringOption((op) =>
+										op.setName(String(option.IntChoices.name).replace(/\s+/g, '_').toLowerCase()).setDescription(option.IntChoices.description).setRequired(option.IntChoices.required)
+										.addChoices(option.IntChoices.choices.map(c=> [String(c[0]).replace(/\s+/g, '_').toLowerCase(),parseInt(c[1])] )),
+									)
+								} else {
+									console.log(`Une option est manquante dans le nom ou la description de la commande ${pull.name}`)
+								}
+							}
+						}
+						allCommands.push(Command.toJSON());
+						client.slashCommands.set("normal" + pull.name, pull)
+				} 
+				else {
+					console.log(file, `[ERROR] Il me manque un help.name, ou help.name n'est pas un string.`.brightRed);
+				}
+			}
+        });
+        
+		//Once the Bot is ready, add all Slas Commands to each guild
+		client.on("ready", () => {
+			if(config.loadSlashsGlobal){
+				client.application.commands.set(allCommands)
+				.then(slashCommandsData => {
+					console.log(`${slashCommandsData.size} commandes slash ${`(Avec ${slashCommandsData.map(d => d.options).flat().length} sous commandes)`.green} ${`chargées sur tous les serveurs.`}`.brightGreen); 
+					console.log(`Vu que vous avez activé le mode global pour certaines commandes, je peux prendre jusqu'à 1 heure pour les charger sur tous les serveurs.`.brightGreen)
+				}).catch((e)=>console.log(e));
+			} else {
+				client.guilds.cache.map(g => g).forEach((guild) => {
+					try{
+						guild.commands.set(allCommands)
+						.then(slashCommandsData => {
+							console.log(`${slashCommandsData.size} commandes slash ${`(Avec ${slashCommandsData.map(d => d.options).flat().length} sous-commandes)`.green} chargée(s) pour le serveur : ${`${guild.name}`.underline}`.brightGreen); 
+						}).catch((e)=>console.log(e));
+					}catch (e){
+						console.log(String(e).grey)
+					}
+				});
+			}
+		})
+		//DISABLE WHEN USING GLOBAL!
+		client.on("guildCreate", (guild) => {
+			try{
+				if(!config.loadSlashsGlobal){
+					guild.commands.set(allCommands)
+						.then(slashCommandsData => {
+							console.log(`${slashCommandsData.size} commandes slash ${`(With ${slashCommandsData.map(d => d.options).flat().length} sous-commandes)`.green} chargée(s) pour le serveur : ${`${guild.name}`.underline}`.brightGreen); 
+						}).catch((e)=>console.log(e));
+				}
+			}catch (e){
+				console.log(String(e).grey)
+			}
+		})
+		
+    } catch (e) {
+        console.log(String(e.stack).bgRed)
+    }
+};
 
 
-client.login(config.token)
+
+
+// login to discord
+client.login(client.config.token)

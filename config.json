@@ -1,0 +1,8 @@
+{
+    "token": "token",
+    "loadSlashsGlobal": false,
+    "slashCommandsDirs": [],
+    "prefix": "!",
+    "owner": "",
+    "owners": []
+}
