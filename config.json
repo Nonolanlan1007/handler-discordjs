@@ -1,7 +1,13 @@
 {
     "token": "token",
     "loadSlashsGlobal": false,
-    "slashCommandsDirs": [],
+    "slashCommandsDirs": [
+        {
+            "Folder": "utilitaires",
+            "CmdName": "u",
+            "CmdDescription": "Ben en fait, toutes les commandes utiles du serveur ne rentrant pas dans les autres catégories !"
+        }
+    ],
     "prefix": "!",
     "owner": "",
     "owners": []
