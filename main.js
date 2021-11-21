@@ -1,6 +1,6 @@
 const { Client, Intents, Collection } = require("discord.js"),
       { version } = require("./package.json"),
-      { readdirSync, read } = require("fs"),
+      { readdirSync } = require("fs"),
       { join } = require("path"),
       colors = require("colors"),
       config = require("./config.json")
@@ -30,6 +30,7 @@ const client = new Client({
 client.commands = new Collection();
 client.slashCommands = new Collection();
 client.cooldowns = new Collection()
+client.top = new Collection()
 client.version = version;
 client.config = require("./config.json");
 client.colors = {
@@ -48,7 +49,6 @@ for (let i = 0; i < folders.length; i++) {
         try {
             const command = require(join(__dirname, "commands", folders[i], c))
             client.commands.set(command.name, command)
-            if (command.aliases.length > 0) commands.aliases.forEach(a => { client.commands.set(command.name, command) })
         }
         catch (err) {
             console.log(colors.red("[COMMANDS]") + ` ➜ Impossible de charger la commande ${c} : ${err.stack || err}`)
@@ -58,29 +58,24 @@ for (let i = 0; i < folders.length; i++) {
 }
 
 // load events
-let count = 0;
-const folders = readdirSync(join(__dirname, "events"));
-for (let i = 0; i < folders.length; i++) {
-    const events = readdirSync(join(__dirname, "events", folders[i]))
-    count = count + events.length;
-    for (const e of events) {
-        try {
-            const event = require(join(__dirname, "events", folders[i], e))
-            const eName = e.split(".")[0];
-            client.on(eName, event.bind(null, client))
-            delete require.cache[require.resolve(join(__dirname, "events", e))]
-        }
-        catch (err) {
-            console.log(colors.red("[EVENTS]") + ` ➜ Impossible de charger l'évènement ${e} : ${err.stack || err}`)
-        }
-    }
-    console.log(colors.green("[EVENTS]") + ` ➜ ${count}/${folders.length}`)
-}
+let counting = 0;
+const files = readdirSync(join(__dirname, "events"));
+files.forEach((e) => {
+	try {
+		counting++;
+		const fileName = e.split('.')[0];
+		const file = require(join(__dirname, "events", e));
+		client.on(fileName, file.bind(null, client));
+		delete require.cache[require.resolve(join(__dirname, "events", e))];
+	} catch (error) {
+		console.log(`${colors.red('[Events]')} ➜ Une erreur est survenue lors du chargement de l'évènement ${e}: ${error.stack || error}`)
+	}
+});
+console.log(`${colors.green('[Events]')} ➜ ${counting}/${files.length} évènement(s) chargé(s).`)
 
 // load slashs
-const { readdirSync, lstatSync } = require("fs");
+const { lstatSync } = require("fs");
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const config = require("../configs/config.json");
 const dirSetup = config.slashCommandsDirs;
 module.exports = (client) => {
     try {
